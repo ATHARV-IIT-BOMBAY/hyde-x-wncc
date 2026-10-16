@@ -1,0 +1,30 @@
+# .gitignore — Hyde × WnCC
+# Keep repo small and CPU-reproducible
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+*.pt
+*.pth
+*.ckpt
+
+# Weights / checkpoints (generated after 11:00 on hackathon day — don't commit)
+scaffold/best.pt
+scaffold/*.pt
+checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*~
+
+# Session
+.claude/
