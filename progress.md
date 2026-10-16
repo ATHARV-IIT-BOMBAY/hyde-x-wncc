@@ -49,3 +49,21 @@ Task: CPU-only small transformer bot for 2-player simplified Catan (10 VP, 5 res
 **Files changed:** `progress.md`
 **Results / measurements:** none
 **Open issues / handoff to next agent:** No code changed yet. Wait for the problem statement to be committed, then parse it into: env API, action space, observation, constraints, eval format, rules.
+
+### [2026-10-16 19:23 UTC] Agent: Notion AI
+**Task given by user:** Update working context from the GitHub repo.
+**What I did:**
+- Read all 13 tracked files at snapshot d74de973204a4b08ca842193b8e8a7eea958c091: shared instructions, plans, documentation, ignore rules, and scaffold implementation.
+- Adopted sequential-agent coordination and append-only handoffs from this file.
+- Confirmed by static inspection the known evaluation winner-attribution bug; left it untouched as requested in the existing handoff.
+**Why:**
+- Align future assistance with actual code and shared decisions rather than the earlier chat summary alone.
+**Files changed:** `progress.md` only (this appended entry).
+**Results / measurements:** No training, evaluation, or timing benchmarks run. Existing win-rate claims are not reliable until the evaluation bug is fixed and results rerun.
+**Open issues / handoff to next agent:**
+- Official statement and Catan implementation are not present in this snapshot. Wait for official API/rules; scaffold eligibility still requires organizer confirmation.
+- Current model has a fixed action head, not a variable candidate scorer; adapt only after the official action API is known.
+- Training splits overlapping trajectory windows across train/validation; split by game before constructing windows for a cleaner validation estimate.
+- Both toy solvers assign a negative score to an immediate winning move inside recursive negamax; review teacher correctness before relying on generated expert labels.
+- Mixed data generation includes random actions as BC targets, and inference uses random fallback rather than legal-logit masking.
+- Preserve the no-code-change request for this context-refresh task. No bugs fixed or new performance claims made.
