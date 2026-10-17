@@ -114,3 +114,14 @@ Task: CPU-only small transformer bot for 2-player simplified Catan (10 VP, 5 res
 **Files changed:** `progress.md`
 **Results / measurements:** 400 games against F: **193/400 wins, win rate 0.4825 ± 0.0490; mean CPU 165.6 ms/game; worst CPU 370.0 ms/game; 0 games over budget; 0 random moves after exhaustion; 0 errors across 22,018 decisions; 0 timeouts/crashes; load time 0.00 s; wall clock 163.5 s.** The interval includes an even matchup, so this is a clean baseline rather than evidence of a strength edge.
 **Open issues / handoff to next agent:** Run the required 1,000-game v0 evaluation against F before upload #1. If it remains fault-free and inside the clock, preserve v0 as the fallback and begin v1 chance-aware evaluation.
+
+### [2026-10-17 11:48 IST] Agent: OmniRush.ai (gpt-6-astra)
+**Task given by user:** Review and record the required 1,000-game v0 evaluation against F.
+**What I did:**
+- Reviewed the official evaluator output from the team machine.
+- Confirmed v0 is a clean, reproducible fallback with no clock or interface failures.
+**Why:**
+- The 1,000-game run is the required upload-quality baseline before changing one algorithmic variable for v1.
+**Files changed:** `progress.md`
+**Results / measurements:** 1,000 games against F: **492/1,000 wins, win rate 0.4920 ± 0.0310; mean CPU 166.5 ms/game; worst CPU 380.0 ms/game; 0 games over budget; 0 random moves after exhaustion; 0 errors across 55,499 decisions; 0 timeouts/crashes; load time 0.00 s; wall clock 412.5 s.**
+**Open issues / handoff to next agent:** v0 is ready as the fallback and for an early baseline upload to measure VS O. Preserve this commit/version unchanged, then implement v1 chance-aware one-ply evaluation and compare it against v0 on the same 400-game seeds.
