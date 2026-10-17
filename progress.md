@@ -163,3 +163,14 @@ Task: CPU-only small transformer bot for 2-player simplified Catan (10 VP, 5 res
 **Files changed:** `submission/agent.py`, `progress.md`
 **Results / measurements:** `python3 -m py_compile submission/agent.py` passed. The dependency-free v2 structural stub test passed, including exact chance-branch weights and a legal integer decision. The official remote v2 evaluator has not run yet.
 **Open issues / handoff to next agent:** Pull the latest commit on the team machine and run a short v2 smoke evaluation first. Watch CPU, over-budget games, errors, and timeouts closely; if v2 is too slow, reduce the beam/continuation widths before any longer run.
+
+### [2026-10-17 12:30 IST] Agent: OmniRush.ai (gpt-6-astra)
+**Task given by user:** Review the first official v2 smoke evaluation against F.
+**What I did:**
+- Reviewed the remote 20-game v2 output and confirmed the new shallow search remains legal and inside the cumulative clock.
+- Kept the current four-root/f six-continuation beam unchanged pending a larger same-seed comparison.
+**Why:**
+- V2 is more expensive than v1, so the first gate is safety: no over-clock games, exceptions, illegal indices, or process failures before measuring strength.
+**Files changed:** `progress.md`
+**Results / measurements:** 20 games against F: **11/20 wins, win rate 0.5500 ± 0.2180; mean CPU 349.0 ms/game; worst CPU 760.0 ms/game; 0 games over budget; 0 random moves after exhaustion; 0 errors across 1,029 decisions; 0 timeouts/crashes; load time 0.00 s; wall clock 12.9 s.** The win-rate interval is too wide to compare reliably, while CPU is +149.6 ms/game versus v1's 199.4 ms 400-game mean.
+**Open issues / handoff to next agent:** Run the same 400-game seed sequence against F. If v2 remains fault-free and improves the point estimate without pushing games over budget, preserve it; otherwise reduce `V2_BEAM_WIDTH` or `V2_CONTINUATION_WIDTH` before further evaluation.
