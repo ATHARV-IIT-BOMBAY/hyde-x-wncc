@@ -67,3 +67,15 @@ Task: CPU-only small transformer bot for 2-player simplified Catan (10 VP, 5 res
 - Both toy solvers assign a negative score to an immediate winning move inside recursive negamax; review teacher correctness before relying on generated expert labels.
 - Mixed data generation includes random actions as BC targets, and inference uses random fallback rather than legal-logit masking.
 - Preserve the no-code-change request for this context-refresh task. No bugs fixed or new performance claims made.
+
+### [2026-10-17 10:54 IST] Agent: OmniRush.ai (gpt-6-astra)
+**Task given by user:** Rebuild the final hackathon execution plan from the official Catan starter repository and push it to GitHub.
+**What I did:**
+- Read the official problem repository at `lyric-hyde/catan-hackathon-agent` commit `04fffac`, including the problem statement, observation masking, process harness, clock, evaluator, requirements, and F reference agent.
+- Added `HACKATHON_PLAN.md` with the direct-agent API, confirmed constraints, v0–v4 milestone order, CPU-budgeted search plan, experiment gates, upload checklist, report requirements, and Git/progress discipline.
+- Chose to keep weight tuning after chance-aware search and end-of-turn search: tuning a one-ply policy first could overfit weights that are invalidated by the final search policy.
+**Why:**
+- The earlier generic Gym/transformer plan does not match the official dynamic `playable_actions` interface or the cumulative one-core CPU clock. The team needs a fault-free F-style baseline before optional learned work.
+**Files changed:** `HACKATHON_PLAN.md`, `progress.md`
+**Results / measurements:** No application benchmark run; the pinned self-check and v0 evaluation remain the next actions.
+**Open issues / handoff to next agent:** Run the official kit's `python -m catan_kit.selfcheck`, then implement and benchmark v0. Do not claim win rates until the evaluator prints them. Keep `scaffold/` out of the submission zip and append actual measurements here after each milestone.
