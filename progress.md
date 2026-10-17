@@ -139,3 +139,14 @@ Task: CPU-only small transformer bot for 2-player simplified Catan (10 VP, 5 res
 **Files changed:** `submission/agent.py`, `progress.md`
 **Results / measurements:** `python3 -m py_compile submission/agent.py` passed. A local dependency-free structural stub test passed: 11 roll branches with total weight 36, development branches weighted by deck counts, robber branches weighted by victim hand counts, and a legal integer decision. The official remote v1 evaluator has not run yet.
 **Open issues / handoff to next agent:** Pull this commit on the team machine and run v1 against F on the same 400-game seed sequence used for v0. Compare win rate, CPU, over-budget games, and faults before considering v1 an improvement. Do not upload v0 or v1 until the comparison is reviewed.
+
+### [2026-10-17 12:19 IST] Agent: OmniRush.ai (gpt-6-astra)
+**Task given by user:** Review the first official 400-game v1 comparison against F.
+**What I did:**
+- Compared the v1 output with the v0 400-game gate on the same default evaluator seed sequence.
+- Confirmed v1 is fault-free and remains well inside the cumulative CPU clock.
+**Why:**
+- This is the required one-change gate for deciding whether chance-aware scoring is a promising replacement for the v0 fallback.
+**Files changed:** `progress.md`
+**Results / measurements:** v1 over 400 games against F: **204/400 wins, win rate 0.5100 ± 0.0490; mean CPU 199.4 ms/game; worst CPU 480.0 ms/game; 0 games over budget; 0 random moves after exhaustion; 0 errors across 22,149 decisions; 0 timeouts/crashes; load time 0.00 s; wall clock 177.1 s.** Compared with v0's 0.4825 ± 0.0490 and 165.6 ms/game, v1 is +2.75 percentage points at +33.8 ms/game mean CPU (+20.4%). The confidence intervals overlap, so this is promising evidence, not a statistically conclusive win yet.
+**Open issues / handoff to next agent:** Run the 1,000-game v1 evaluation against F before deciding whether the improvement is robust. Keep v0 at commit `9868b58` as the fallback; do not upload yet.
