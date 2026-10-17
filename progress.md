@@ -79,3 +79,16 @@ Task: CPU-only small transformer bot for 2-player simplified Catan (10 VP, 5 res
 **Files changed:** `HACKATHON_PLAN.md`, `progress.md`
 **Results / measurements:** No application benchmark run; the pinned self-check and v0 evaluation remain the next actions.
 **Open issues / handoff to next agent:** Run the official kit's `python -m catan_kit.selfcheck`, then implement and benchmark v0. Do not claim win rates until the evaluator prints them. Keep `scaffold/` out of the submission zip and append actual measurements here after each milestone.
+
+### [2026-10-17 11:19 IST] Agent: OmniRush.ai (gpt-6-astra)
+**Task given by user:** Start executing the final plan with the v0 direct-agent baseline.
+**What I did:**
+- Added `submission/agent.py` implementing the official `Agent.decide(obs, playable_actions) -> int` interface.
+- Implemented fresh F-style one-ply search over a single masked sampled world, successor scoring with catanatron's 13-feature value function, deterministic tie-breaking, cumulative-clock budgeting via `obs.cpu_left`, cheap low-clock fallback, and exception-safe legal-index fallback.
+- Added public-observation new-game detection using seat colour, turn decreases, and board building/road counts. The private RNG remains persistent because the harness does not expose a game seed.
+- Confirmed the team machine environment from the user's terminal output: Python 3.11.16, catanatron 3.3.0, networkx 3.6.1, determinism patch applied, and all official self-checks passed. The reported F-vs-random smoke run was 1.00 over 20 games with 180 ms mean CPU/game, 0 over-budget games, and 0 errors; repeated-run decisions were 976 and 976.
+**Why:**
+- v0 must validate the real submission interface and safety path before chance averaging or deeper search. It must return a legal index even when a sampled-world branch or feature evaluation fails.
+**Files changed:** `submission/agent.py`, `progress.md`
+**Results / measurements:** Local `python3 -m py_compile submission/agent.py` passed. The v0 agent has not yet been run through the official evaluator because this assistant shell cannot authenticate to the password-only SSH session (`Permission denied (password)` in non-interactive mode).
+**Open issues / handoff to next agent:** Run the v0 agent from the installed team kit with the official `catan_kit.evaluate` against F, then record the actual v0 metrics before attempting the first upload. Do not send or commit the SSH password; either provide an SSH key accessible to this environment or run the remote commands from the team's terminal.
