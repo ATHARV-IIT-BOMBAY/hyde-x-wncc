@@ -210,3 +210,16 @@ Task: CPU-only small transformer bot for 2-player simplified Catan (10 VP, 5 res
 **Files changed:** `submission/agent.py`, `submission/catanfeat.py`, `submission/config.json`, `submission/model.npz`, `progress.md`
 **Results / measurements:** `python3 -m py_compile submission/agent.py submission/catanfeat.py` passed. The model artifact validated as a 71→32→1, two-layer NumPy network with the supplied depth-3/beam-3 config. The official remote evaluator has not yet run this candidate.
 **Open issues / handoff to next agent:** Treat the attached files as submit-able only because the user stated they are this team's artifacts; if they came from another team, do not use them under the official fair-play rules. Pull the commit and run a 20-game smoke test against F before changing the learned code.
+
+### [2026-10-17 14:10 IST] Agent: OmniRush.ai (gpt-6-astra)
+**Task given by user:** Investigate why the supplied learned candidate is only around 0.60 VS F in a 20-game smoke and improve it quickly.
+**What I did:**
+- Repaired the learned feature contract: `me_to_move_next` now reflects `State.current_player_index` instead of being hard-coded to zero. This is a trained 71st feature; the model artifact's mean/std showed it was observed as a real binary feature during training.
+- Made `ROLL` a real expected-value transition over the exact 2d6 distribution using forced `ActionRecord` dice, and made `END_TURN` a normal successor so the model sees the opponent-to-move state.
+- Fixed recursive stopping during Road Building, where the engine requires another road even though the prompt remains `PLAY_TURN`.
+- Corrected `catanfeat.n_features()` from the stale 73-value formula to the actual 71-feature model contract.
+**Why:**
+- The prior candidate was optimizing incorrect state semantics: it treated rolling and ending the turn as no-ops and fed the MLP an always-zero phase bit. These defects can systematically select bad pre-roll/end-turn decisions; deeper search or more CPU would not repair them.
+**Files changed:** `submission/agent.py`, `submission/catanfeat.py`, `progress.md`
+**Results / measurements:** `python3 -m py_compile submission/agent.py submission/catanfeat.py` passed. Static semantic checks passed, including exact roll branch total weight 36, forced `ActionRecord` use, active side-to-move feature, real END_TURN path, and Road Building forced-choice handling. The official evaluator has not yet run this repaired candidate.
+**Open issues / handoff to next agent:** Pull the latest commit and run a 20-game smoke against F. Compare VS F, CPU, over-clock games, and faults with the prior candidate (`0.6000 ± 0.2147`, 163.0 ms/game, zero faults). If safe, run 400 games; only then decide whether to spend remaining time on opponent-threat scoring or budget tuning.

@@ -2,8 +2,9 @@
 
   * V(s) = P(win | features(s)), a small MLP fitted on self-play outcomes (model.npz).
   * Every legal action is scored by V of its successor (batched forward pass). Chance actions are
-    scored in expectation: dev-card purchases over the unseen pile, robber steals over the victim's
-    hand. Rolling / ending the turn is scored as the current position.
+    scored in expectation: dice rolls over the exact 2d6 distribution, dev-card purchases over the
+    unseen pile, and robber steals over the victim's hand. Ending the turn is evaluated as a real
+    successor with the opponent to move.
   * While CPU budget remains, the best candidates are expanded through our own follow-up
     decisions in the same turn (trade -> build, knight -> robber, road building -> roads).
   * The per-decision budget is a fraction of the CPU left on the clock, so spending stabilises.
@@ -25,12 +26,35 @@ import catanfeat as FT  # noqa: E402
 from catanatron.apply_action import apply_action  # noqa: E402
 from catanatron.models.actions import generate_playable_actions  # noqa: E402
 from catanatron.models.board import Board  # noqa: E402
-from catanatron.models.enums import Action, ActionPrompt, ActionType, RESOURCES  # noqa: E402
+from catanatron.models.enums import (  # noqa: E402
+    Action,
+    ActionPrompt,
+    ActionRecord,
+    ActionType,
+    RESOURCES,
+)
 from catanatron.state import State  # noqa: E402
 
 DEVS = ["KNIGHT", "VICTORY_POINT", "ROAD_BUILDING", "YEAR_OF_PLENTY", "MONOPOLY"]
 WIN = 10.0
 AT = ActionType
+
+# Exact 2d6 sum distribution.  ``apply_roll`` consumes the forced dice from
+# ActionRecord.result, so these are real state transitions rather than a
+# no-op approximation of rolling.
+ROLL_OUTCOMES = (
+    (1, (1, 1)),
+    (2, (1, 2)),
+    (3, (1, 3)),
+    (4, (1, 4)),
+    (5, (1, 5)),
+    (6, (1, 6)),
+    (5, (2, 6)),
+    (4, (3, 6)),
+    (3, (4, 6)),
+    (2, (5, 6)),
+    (1, (6, 6)),
+)
 
 
 def fast_copy(s):
@@ -127,7 +151,11 @@ class Agent:
 
     # ---------------------------------------------------------------- evaluation
     def feats(self, s, me):
-        return FT.features(s, me, 0)
+        # This bit is part of the trained 71-feature contract.  The previous
+        # candidate hard-coded zero, making every post-END_TURN and
+        # same-turn successor look like an identical phase to the MLP.
+        me_to_move = int(s.colors[s.current_player_index] == me)
+        return FT.features(s, me, me_to_move)
 
     def is_win(self, s, me):
         return s.player_state[f"P{s.color_to_index[me]}_ACTUAL_VICTORY_POINTS"] >= 10
@@ -150,6 +178,13 @@ class Agent:
     def expand(self, s, a, me):
         """List of (weight, state) outcomes of action a from state s (chance handled explicitly)."""
         at = a.action_type
+        if at == AT.ROLL:
+            outs = []
+            for weight, dice in ROLL_OUTCOMES:
+                o = fast_copy(s)
+                apply_action(o, a, ActionRecord(a, dice))
+                outs.append((weight / 36.0, o))
+            return outs
         if at == AT.MOVE_ROBBER and a.value[1] is not None:
             base = fast_copy(s)
             apply_action(base, Action(a.color, at, (a.value[0], None)))
@@ -217,9 +252,6 @@ class Agent:
         groups, states = [], []
         for a in acts:
             at = a.action_type
-            if at in (AT.ROLL, AT.END_TURN):
-                groups.append(None)
-                continue
             try:
                 outs = self.expand(s, a, me)
             except Exception:
@@ -258,7 +290,12 @@ class Agent:
         if not acts:
             return cur
         sc = self.score_actions(s, acts, me, cur)
-        must_choose = s.current_prompt != ActionPrompt.PLAY_TURN
+        # Road Building leaves current_prompt at PLAY_TURN while the engine
+        # requires another road action.  The search must not treat the current
+        # state as an optional stopping point in that forced sub-phase.
+        must_choose = (
+            s.current_prompt != ActionPrompt.PLAY_TURN or s.is_road_building
+        )
         best = max(v for v, _ in sc)
         if not must_choose:
             best = max(best, cur)

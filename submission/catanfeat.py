@@ -154,4 +154,7 @@ N_FEATURES = None
 
 
 def n_features():
-    return 3 + 2 * 18 + 8 + 10 + 4 + 3 + 5 + 2 + 2
+    # Keep the helper aligned with the actual vector and model.npz.  Each
+    # side contributes 17 values (not 18); adding the trained side-to-move
+    # bit still leaves the artifact at 71 features.
+    return 3 + 2 * 17 + 8 + 10 + 4 + 3 + 5 + 2 + 2
