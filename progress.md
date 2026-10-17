@@ -92,3 +92,14 @@ Task: CPU-only small transformer bot for 2-player simplified Catan (10 VP, 5 res
 **Files changed:** `submission/agent.py`, `progress.md`
 **Results / measurements:** Local `python3 -m py_compile submission/agent.py` passed. The v0 agent has not yet been run through the official evaluator because this assistant shell cannot authenticate to the password-only SSH session (`Permission denied (password)` in non-interactive mode).
 **Open issues / handoff to next agent:** Run the v0 agent from the installed team kit with the official `catan_kit.evaluate` against F, then record the actual v0 metrics before attempting the first upload. Do not send or commit the SSH password; either provide an SSH key accessible to this environment or run the remote commands from the team's terminal.
+
+### [2026-10-17 11:29 IST] Agent: OmniRush.ai (gpt-6-astra)
+**Task given by user:** Run the first v0 smoke evaluation on the official team machine.
+**What I did:**
+- Had the user run the official evaluator against `examples/f_agent.py` using the pushed `submission/agent.py`.
+- Reviewed the reported result and kept the v0 implementation unchanged because it completed the full smoke run without faults, crashes, timeouts, or clock overruns.
+**Why:**
+- The smoke run validates the real direct-agent interface and the safety wrapper before spending time on the 400-game gate or an upload.
+**Files changed:** `progress.md`
+**Results / measurements:** 20 games against F: **8/20 wins, win rate 0.4000 ± 0.2147; mean CPU 150.5 ms/game; worst CPU 230.0 ms/game; 0 games over budget; 0 random moves after exhaustion; 0 errors across 1,056 decisions; 0 timeouts/crashes; load time 0.00 s; wall clock 8.2 s.**
+**Open issues / handoff to next agent:** Run the required 400-game v0 gate against F using the same default seed sequence, then decide whether v0 is ready for upload #1. The smoke interval is wide, so do not interpret 0.4000 as a stable strength estimate yet.
