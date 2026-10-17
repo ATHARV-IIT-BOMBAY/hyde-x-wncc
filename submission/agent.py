@@ -1,18 +1,16 @@
-"""v2 Catan agent: chance-aware one-ply search plus shallow turn lookahead.
+"""v3 candidate: contender-weight chance-aware one-ply search.
 
 The official harness calls ``Agent.decide(obs, playable_actions)`` and expects
-an integer index into the supplied action list.  This file deliberately keeps
-the first version small and boring: sample one legal world, execute every
-candidate on a copy, and choose the successor with catanatron's supplied
-13-feature value function.
+an integer index into the supplied action list.  This candidate keeps the v0
+safety wrapper and v1 chance handling, but replaces F's default value weights
+with catanatron's pinned public contender weights.
 
-v2 keeps the v0 safety wrapper and v1 value function, but evaluates the engine's
-chance actions with explicit weighted outcomes.  Rolls use the two-dice
-distribution, development-card buys use the sampled deck composition, and
-robber steals use the victim's visible resource frequencies.  The sampled
-world is still only one hidden development-card assignment; more worlds belong
-to a later milestone.  After root scoring, v2 uses a small beam to score one
-best continuation while it is still our turn.
+Rolls use the two-dice distribution, development-card buys use the sampled
+deck composition, and robber steals use the victim's visible resource
+frequencies.  The sampled world is still only one hidden development-card
+assignment; more worlds belong to a later milestone.  The v2 own-turn beam
+remains in the file for comparison but is not active after its 400-game result
+failed to improve v1.
 """
 
 from __future__ import annotations
@@ -28,13 +26,15 @@ from catanatron.models.enums import (
     DEVELOPMENT_CARDS,
     RESOURCES,
 )
-from catanatron.players.value import DEFAULT_WEIGHTS, get_value_fn
+from catanatron.players.value import CONTENDER_WEIGHTS, get_value_fn
 from catanatron.state_functions import player_num_resource_cards
 
 
-# Build the closure once at import time.  The official F agent does the same;
-# constructing it inside decide would charge setup work to every game.
-VALUE_FN = get_value_fn("base_fn", DEFAULT_WEIGHTS)
+# Build the closure once at import time.  F uses DEFAULT_WEIGHTS; this v3
+# candidate uses the pinned engine's public contender weights as the one
+# controlled policy change.  Constructing the closure inside decide would
+# charge setup work to every game.
+VALUE_FN = get_value_fn("contender_fn", CONTENDER_WEIGHTS)
 
 
 # One representative ordered dice pair per sum is sufficient for the current
@@ -56,7 +56,7 @@ ROLL_OUTCOMES = (
 
 
 class Agent:
-    """Fault-tolerant chance-aware search with a shallow own-turn beam."""
+    """Fault-tolerant contender-weight chance-aware search."""
 
     # Leave room for the harness and for later decisions in the same game.
     CPU_RESERVE_S = 0.010
@@ -550,7 +550,10 @@ class Agent:
             if remaining is not None and remaining <= self.CHEAP_FALLBACK_S:
                 return self._cheap_index(actions)
 
-            index = self._score_actions_v2(obs, actions)
+            # v2's own-turn beam is retained for comparison, but the active
+            # emergency candidate is the faster v1 chance search with the
+            # contender weights selected above.
+            index = self._score_actions_v1(obs, actions)
             if type(index) is int and 0 <= index < len(actions):
                 return index
         except Exception:

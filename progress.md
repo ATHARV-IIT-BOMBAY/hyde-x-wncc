@@ -174,3 +174,27 @@ Task: CPU-only small transformer bot for 2-player simplified Catan (10 VP, 5 res
 **Files changed:** `progress.md`
 **Results / measurements:** 20 games against F: **11/20 wins, win rate 0.5500 ± 0.2180; mean CPU 349.0 ms/game; worst CPU 760.0 ms/game; 0 games over budget; 0 random moves after exhaustion; 0 errors across 1,029 decisions; 0 timeouts/crashes; load time 0.00 s; wall clock 12.9 s.** The win-rate interval is too wide to compare reliably, while CPU is +149.6 ms/game versus v1's 199.4 ms 400-game mean.
 **Open issues / handoff to next agent:** Run the same 400-game seed sequence against F. If v2 remains fault-free and improves the point estimate without pushing games over budget, preserve it; otherwise reduce `V2_BEAM_WIDTH` or `V2_CONTINUATION_WIDTH` before further evaluation.
+
+### [2026-10-17 12:37 IST] Agent: OmniRush.ai (gpt-6-astra)
+**Task given by user:** Review the official 400-game v2 result and change direction if it does not improve strength.
+**What I did:**
+- Compared v2 with the measured v0/v1 baselines on the same default 400-game evaluation.
+- Rejected the current v2 own-turn beam as the active policy: it costs substantially more CPU without improving the point estimate over v1.
+- Chose the next emergency experiment: retain v1's safer chance-aware search, replace F's default value weights with the pinned engine's public contender weights, and measure that change separately.
+**Why:**
+- The 400-game result is the first reliable v2 signal: deeper own-turn search alone is not buying strength. The leaderboard gap requires a value-policy change, not simply more successor evaluations.
+**Files changed:** `progress.md`
+**Results / measurements:** v2 over 400 games against F: **200/400 wins, win rate 0.5000 ± 0.0490; mean CPU 334.6 ms/game; worst CPU 880.0 ms/game; 0 games over budget; 0 random moves after exhaustion; 0 errors across 19,067 decisions; 0 timeouts/crashes; load time 0.00 s; wall clock 234.8 s.** Compared with v1's 0.5100 ± 0.0490 and 199.4 ms/game, v2 is -1.0 percentage point at +135.2 ms/game mean CPU (+67.8%).
+**Open issues / handoff to next agent:** Keep v2 in Git history but do not submit it. Test the contender-weight/v1 candidate next; if it does not move the result materially, implement opponent-threat/response scoring rather than increasing search depth again.
+
+### [2026-10-17 12:43 IST] Agent: OmniRush.ai (gpt-6-astra)
+**Task given by user:** Continue immediately after v2 failed to improve the 400-game baseline and push the next candidate.
+**What I did:**
+- Switched the active policy back to the faster v1 chance-aware search.
+- Replaced F's `DEFAULT_WEIGHTS` with the pinned catanatron `CONTENDER_WEIGHTS`, keeping the change isolated as the next experiment.
+- Left v2's own-turn beam in the file and Git history for reference, but it is no longer active in `decide`.
+**Why:**
+- v2 increased CPU by 67.8% over v1 without improving VS F. The next high-leverage change is value-policy quality, not more depth. The contender weights are public engine material and emphasize reachability, roads, hand synergy, and army progress.
+**Files changed:** `submission/agent.py`, `progress.md`
+**Results / measurements:** `python3 -m py_compile submission/agent.py` passed. The dependency-free structural test passed with the contender-weight import, exact chance weights, and a valid branch structure. No official remote run has measured the contender candidate yet.
+**Open issues / handoff to next agent:** Pull the latest commit and run a 20-game smoke test, then a 400-game same-seed comparison if it is fault-free. Do not claim that the contender weights improve strength until the evaluator measures them.
