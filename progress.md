@@ -198,3 +198,15 @@ Task: CPU-only small transformer bot for 2-player simplified Catan (10 VP, 5 res
 **Files changed:** `submission/agent.py`, `progress.md`
 **Results / measurements:** `python3 -m py_compile submission/agent.py` passed. The dependency-free structural test passed with the contender-weight import, exact chance weights, and a valid branch structure. No official remote run has measured the contender candidate yet.
 **Open issues / handoff to next agent:** Pull the latest commit and run a 20-game smoke test, then a 400-game same-seed comparison if it is fault-free. Do not claim that the contender weights improve strength until the evaluator measures them.
+
+### [2026-10-17 12:51 IST] Agent: OmniRush.ai (gpt-6-astra)
+**Task given by user:** Review the supplied teammate learned evaluator and try to raise VS F substantially; user stated the artifacts belong to this team.
+**What I did:**
+- Replaced the active contender-weight candidate with the supplied observation-safe learned evaluator candidate.
+- Added the matching `catanfeat.py`, `config.json`, and `model.npz` beside `agent.py` so the submission can load all artifacts relative to its own directory.
+- The candidate uses a 71-feature, 32-hidden-unit NumPy MLP, batched successor evaluation, manual fast state copies, explicit chance outcomes, depth-3/beam-3 within-turn search, and a 30% per-decision CPU budget.
+**Why:**
+- The leaderboard gap indicates that a learned win-probability value model plus cheap batched search is a materially different policy class from our F-style handcrafted value function. This is the first high-leverage architecture change aimed at the reported ~0.697 VS F result.
+**Files changed:** `submission/agent.py`, `submission/catanfeat.py`, `submission/config.json`, `submission/model.npz`, `progress.md`
+**Results / measurements:** `python3 -m py_compile submission/agent.py submission/catanfeat.py` passed. The model artifact validated as a 71→32→1, two-layer NumPy network with the supplied depth-3/beam-3 config. The official remote evaluator has not yet run this candidate.
+**Open issues / handoff to next agent:** Treat the attached files as submit-able only because the user stated they are this team's artifacts; if they came from another team, do not use them under the official fair-play rules. Pull the commit and run a 20-game smoke test against F before changing the learned code.
