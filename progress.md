@@ -150,3 +150,16 @@ Task: CPU-only small transformer bot for 2-player simplified Catan (10 VP, 5 res
 **Files changed:** `progress.md`
 **Results / measurements:** v1 over 400 games against F: **204/400 wins, win rate 0.5100 ± 0.0490; mean CPU 199.4 ms/game; worst CPU 480.0 ms/game; 0 games over budget; 0 random moves after exhaustion; 0 errors across 22,149 decisions; 0 timeouts/crashes; load time 0.00 s; wall clock 177.1 s.** Compared with v0's 0.4825 ± 0.0490 and 165.6 ms/game, v1 is +2.75 percentage points at +33.8 ms/game mean CPU (+20.4%). The confidence intervals overlap, so this is promising evidence, not a statistically conclusive win yet.
 **Open issues / handoff to next agent:** Run the 1,000-game v1 evaluation against F before deciding whether the improvement is robust. Keep v0 at commit `9868b58` as the fallback; do not upload yet.
+
+### [2026-10-17 12:25 IST] Agent: OmniRush.ai (gpt-6-astra)
+**Task given by user:** Start v2 immediately instead of running the v1 1,000-game confirmation.
+**What I did:**
+- Extended `submission/agent.py` with v2 shallow own-turn lookahead.
+- Added a CPU-budgeted root pass, a four-action beam, and up to six continuation candidates while the sampled successor remains our turn.
+- Kept v1's exact chance branches at root and continuation nodes, including forced `ActionRecord` outcomes for rolls, development draws, and robber steals.
+- Made v2 fall back to the best completed v1-style root score or a cheap legal choice when the deadline is reached; it never starts a second full search after consuming the current decision budget.
+**Why:**
+- v1 showed a positive but not yet conclusive 400-game signal. v2 targets the larger weakness—one-ply myopia—while respecting the one-core cumulative clock and preserving v0/v1 in Git history.
+**Files changed:** `submission/agent.py`, `progress.md`
+**Results / measurements:** `python3 -m py_compile submission/agent.py` passed. The dependency-free v2 structural stub test passed, including exact chance-branch weights and a legal integer decision. The official remote v2 evaluator has not run yet.
+**Open issues / handoff to next agent:** Pull the latest commit on the team machine and run a short v2 smoke evaluation first. Watch CPU, over-budget games, errors, and timeouts closely; if v2 is too slow, reduce the beam/continuation widths before any longer run.

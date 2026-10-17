@@ -1,4 +1,4 @@
-"""v1 Catan agent: chance-aware one-ply value search.
+"""v2 Catan agent: chance-aware one-ply search plus shallow turn lookahead.
 
 The official harness calls ``Agent.decide(obs, playable_actions)`` and expects
 an integer index into the supplied action list.  This file deliberately keeps
@@ -6,12 +6,13 @@ the first version small and boring: sample one legal world, execute every
 candidate on a copy, and choose the successor with catanatron's supplied
 13-feature value function.
 
-v1 keeps the v0 safety wrapper and value function, but evaluates the engine's
+v2 keeps the v0 safety wrapper and v1 value function, but evaluates the engine's
 chance actions with explicit weighted outcomes.  Rolls use the two-dice
 distribution, development-card buys use the sampled deck composition, and
 robber steals use the victim's visible resource frequencies.  The sampled
 world is still only one hidden development-card assignment; more worlds belong
-to a later milestone.
+to a later milestone.  After root scoring, v2 uses a small beam to score one
+best continuation while it is still our turn.
 """
 
 from __future__ import annotations
@@ -55,7 +56,7 @@ ROLL_OUTCOMES = (
 
 
 class Agent:
-    """Fault-tolerant chance-aware one-ply search over legal actions."""
+    """Fault-tolerant chance-aware search with a shallow own-turn beam."""
 
     # Leave room for the harness and for later decisions in the same game.
     CPU_RESERVE_S = 0.010
@@ -86,6 +87,14 @@ class Agent:
     # deadline stop a larger root search cleanly.
     MAX_DEV_BRANCHES = len(DEVELOPMENT_CARDS)
     MAX_ROBBER_BRANCHES = len(RESOURCES)
+
+    # v2 uses a shallow beam: first score root actions, then look through one
+    # best continuation while the same decision's CPU deadline remains.  The
+    # beam is intentionally small; a complete tree would spend the allowance
+    # on one turn and leave later decisions random.
+    V2_ROOT_FRACTION = 0.60
+    V2_BEAM_WIDTH = 4
+    V2_CONTINUATION_WIDTH = 6
 
     def __init__(self):
         # The harness does not expose a game seed or a reset callback.  Keep a
@@ -270,8 +279,8 @@ class Agent:
         # example the robber location after a knight) belongs to v2 search.
         return [(1, None)]
 
-    def _branch_value(self, world, action, action_record, obs):
-        """Execute one forced outcome on an isolated copy and score it."""
+    def _execute_branch(self, world, action, action_record):
+        """Execute one forced outcome on an isolated copy."""
         successor = world.copy()
         random_state = random.getstate()
         try:
@@ -279,12 +288,184 @@ class Agent:
                 successor.execute(action)
             else:
                 successor.execute(action, action_record=action_record)
-            return float(self.value_fn(successor, obs.me))
+            return successor
         finally:
             # The branch is fully forced, but restoring the agent process's
             # global PRNG also protects against future engine code that draws
             # randomness while evaluating a successor.
             random.setstate(random_state)
+
+    def _branch_value(self, world, action, action_record, obs):
+        """Execute one forced outcome on an isolated copy and score it."""
+        successor = self._execute_branch(world, action, action_record)
+        return float(self.value_fn(successor, obs.me))
+
+    @classmethod
+    def _continuation_candidates(cls, actions):
+        """Keep a deterministic, diverse subset of a continuation action list."""
+        actions = list(actions)
+        if len(actions) <= cls.V2_CONTINUATION_WIDTH:
+            return actions
+
+        ranked = sorted(
+            enumerate(actions),
+            key=lambda item: (
+                cls.ACTION_PRIORITY.get(
+                    getattr(item[1], "action_type", None), 50
+                ),
+                item[0],
+            ),
+        )
+        selected_indices = {index for index, _ in ranked[: cls.V2_CONTINUATION_WIDTH]}
+
+        # Always retain END_TURN if it exists.  Otherwise the continuation
+        # search can spend all its width on builds and never compare passing.
+        end_turn_index = next(
+            (
+                index
+                for index, action in enumerate(actions)
+                if getattr(action, "action_type", None) == ActionType.END_TURN
+            ),
+            None,
+        )
+        if end_turn_index is not None and end_turn_index not in selected_indices:
+            selected_indices.pop()
+            selected_indices.add(end_turn_index)
+
+        return [action for index, action in enumerate(actions) if index in selected_indices]
+
+    def _evaluate_action_outcomes(
+        self, world, action, obs, deadline, collect_successors=False
+    ):
+        """Return an expected value and optionally its successful successors."""
+        branches = self._outcome_branches(world, action)
+        if not branches:
+            return None, [], False
+
+        weighted_value = 0.0
+        successful_weight = 0
+        successors = []
+        for weight, action_record in branches:
+            if deadline is not None and time.process_time() >= deadline:
+                return None, [], False
+            try:
+                successor = self._execute_branch(world, action, action_record)
+                value = float(self.value_fn(successor, obs.me))
+            except Exception:
+                continue
+            if not math.isfinite(value):
+                continue
+            weighted_value += weight * value
+            successful_weight += weight
+            if collect_successors:
+                successors.append((weight, successor, value))
+
+        if successful_weight == 0:
+            return None, [], True
+        return weighted_value / successful_weight, successors, True
+
+    def _best_continuation_value(self, successor, obs, deadline):
+        """Score the best shallow continuation while it is still our turn."""
+        if deadline is not None and time.process_time() >= deadline:
+            return None, False
+
+        try:
+            current_color = successor.state.current_color()
+        except Exception:
+            return float(self.value_fn(successor, obs.me)), True
+
+        if current_color != obs.me:
+            return float(self.value_fn(successor, obs.me)), True
+
+        actions = self._continuation_candidates(successor.playable_actions)
+        if not actions:
+            return float(self.value_fn(successor, obs.me)), True
+
+        best_value = None
+        for action in actions:
+            if deadline is not None and time.process_time() >= deadline:
+                return None, False
+            value, _, complete = self._evaluate_action_outcomes(
+                successor, action, obs, deadline, collect_successors=False
+            )
+            if not complete:
+                return None, False
+            if value is not None and (best_value is None or value > best_value):
+                best_value = value
+
+        if best_value is None:
+            return float(self.value_fn(successor, obs.me)), True
+        return best_value, True
+
+    def _score_actions_v2(self, obs, actions):
+        """Use a shallow beam to look through one continuation of our turn."""
+        remaining = self._remaining_cpu(obs)
+        start_cpu = time.process_time()
+        deadline = None
+        root_deadline = None
+        if remaining is not None:
+            usable = remaining - self.CPU_RESERVE_S
+            if usable <= 0.0:
+                return self._cheap_index(actions)
+            deadline = start_cpu + usable
+            root_deadline = start_cpu + usable * self.V2_ROOT_FRACTION
+
+        world = obs.sample_world(self.rng)
+        root_results = []
+        root_budget_exhausted = False
+        for index, action in enumerate(actions):
+            if root_deadline is not None and time.process_time() >= root_deadline:
+                root_budget_exhausted = True
+                break
+            value, successors, complete = self._evaluate_action_outcomes(
+                world, action, obs, root_deadline, collect_successors=True
+            )
+            if not complete:
+                root_budget_exhausted = True
+                break
+            if value is not None:
+                root_results.append((value, index, successors))
+
+        if not root_results:
+            if root_budget_exhausted:
+                # v1/v0 would see the original cpu_left snapshot and could
+                # start a second full search after this partial v2 pass.
+                return self._cheap_index(actions)
+            return self._score_actions_v1(obs, actions)
+
+        # The immediate best is always a valid answer if the continuation
+        # budget disappears.  This also gives v2 the v1-quality fallback.
+        root_results.sort(key=lambda result: (-result[0], result[1]))
+        best_root_value, best_root_index, _ = root_results[0]
+        best_final_value = None
+        best_final_index = best_root_index
+
+        for _, index, branch_successors in root_results[: self.V2_BEAM_WIDTH]:
+            if deadline is not None and time.process_time() >= deadline:
+                break
+            weighted_value = 0.0
+            successful_weight = 0
+            complete_candidate = True
+            for weight, successor, immediate_value in branch_successors:
+                continuation_value, complete = self._best_continuation_value(
+                    successor, obs, deadline
+                )
+                if not complete:
+                    complete_candidate = False
+                    break
+                if continuation_value is None:
+                    continuation_value = immediate_value
+                weighted_value += weight * continuation_value
+                successful_weight += weight
+
+            if not complete_candidate or successful_weight == 0:
+                break
+            final_value = weighted_value / successful_weight
+            if best_final_value is None or final_value > best_final_value:
+                best_final_value = final_value
+                best_final_index = index
+
+        return best_final_index if best_final_value is not None else best_root_index
 
     def _score_actions_v1(self, obs, actions):
         """Score legal actions by one-sample-world expected successor value."""
@@ -369,7 +550,7 @@ class Agent:
             if remaining is not None and remaining <= self.CHEAP_FALLBACK_S:
                 return self._cheap_index(actions)
 
-            index = self._score_actions_v1(obs, actions)
+            index = self._score_actions_v2(obs, actions)
             if type(index) is int and 0 <= index < len(actions):
                 return index
         except Exception:
