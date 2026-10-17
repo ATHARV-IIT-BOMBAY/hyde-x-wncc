@@ -125,3 +125,17 @@ Task: CPU-only small transformer bot for 2-player simplified Catan (10 VP, 5 res
 **Files changed:** `progress.md`
 **Results / measurements:** 1,000 games against F: **492/1,000 wins, win rate 0.4920 ± 0.0310; mean CPU 166.5 ms/game; worst CPU 380.0 ms/game; 0 games over budget; 0 random moves after exhaustion; 0 errors across 55,499 decisions; 0 timeouts/crashes; load time 0.00 s; wall clock 412.5 s.**
 **Open issues / handoff to next agent:** v0 is ready as the fallback and for an early baseline upload to measure VS O. Preserve this commit/version unchanged, then implement v1 chance-aware one-ply evaluation and compare it against v0 on the same 400-game seeds.
+
+### [2026-10-17 12:13 IST] Agent: OmniRush.ai (gpt-6-astra)
+**Task given by user:** Start v1 chance-aware one-ply evaluation instead of uploading v0.
+**What I did:**
+- Updated `submission/agent.py` from v0's single successor per action to v1's weighted expected successor value while preserving the v0 scorer as a fallback.
+- Forced roll outcomes through `ActionRecord` using the exact 2d6 sum distribution (11 sum branches, total weight 36).
+- Forced development-card outcomes using the sampled deck composition and robber-steal outcomes using the victim's visible resource frequencies.
+- Added CPU-deadline checks, global-random-state restoration around branches, deterministic branch order, and a no-second-search fallback when v1 consumes its decision budget.
+- Kept one sampled hidden-information world per decision so v1 changes only chance handling; additional world averaging remains a later experiment.
+**Why:**
+- v0 is mathematically valid but trusts one roll/card/steal outcome. v1 reduces that variance without changing the value weights or adding recursive search.
+**Files changed:** `submission/agent.py`, `progress.md`
+**Results / measurements:** `python3 -m py_compile submission/agent.py` passed. A local dependency-free structural stub test passed: 11 roll branches with total weight 36, development branches weighted by deck counts, robber branches weighted by victim hand counts, and a legal integer decision. The official remote v1 evaluator has not run yet.
+**Open issues / handoff to next agent:** Pull this commit on the team machine and run v1 against F on the same 400-game seed sequence used for v0. Compare win rate, CPU, over-budget games, and faults before considering v1 an improvement. Do not upload v0 or v1 until the comparison is reviewed.
